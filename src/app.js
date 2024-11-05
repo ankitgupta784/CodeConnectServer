@@ -1,57 +1,58 @@
 const express = require("express");
 const connectDB = require("./config/database");
-const { adminAuth, userAuth } = require("./middlewares/auth");
 const app = express();
 const User = require("./models/user");
 const { validateSignUpData } = require("./utils/validation");
 const bcrypt = require("bcrypt");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
+const { userAuth } = require("./middlewares/auth");
 
-app.use("/admin", adminAuth);
 app.use(express.json());
 app.use(cookieParser());
 
-app.post("/user/login", (req, res) => {
-  res.send("User logged in successfully!");
-});
-app.get("/user/data", userAuth, (req, res) => {
-  res.send("User Data Sent");
-});
+app.post("/signup", async (req, res) => {
+  try {
+    // Validation of data
+    validateSignUpData(req);
 
-app.get("/getUserData", (req, res) => {
-      try {
-          // Logic of DB call and get user data
-          console.log("DB call done");
-          throw new Error("dvbzhjf");
-          res.send("User Data Sent");
-        } catch (err) {
-          res.status(500).send("Some Error contact support team");
-        }
-});
+    const { firstName, lastName, emailId, password } = req.body;
 
-app.use("/", (err, req, res, next) => {  //wild card route to catch all errors
-  if (err) {
-    // Log your error
-    res.status(500).send("something went wrong");
+    // Encrypt the password
+    const passwordHash = await bcrypt.hash(password, 10);
+    console.log(passwordHash);
+
+    //   Creating a new instance of the User model
+    const user = new User({
+      firstName,
+      lastName,
+      emailId,
+      password: passwordHash,
+    });
+
+    await user.save();
+    res.send("User Added successfully!");
+  } catch (err) {
+    res.status(400).send("ERROR : " + err.message);
   }
 });
-
 
 app.post("/login", async (req, res) => {
   try {
     const { emailId, password } = req.body;
+
     const user = await User.findOne({ emailId: emailId });
     if (!user) {
       throw new Error("Invalid credentials");
     }
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    
+    const isPasswordValid = await user.validatePassword(password);
+
     if (isPasswordValid) {
-       // Create a JWT Token
-       const token = await jwt.sign({ _id: user._id }, "DEV@Tinder$790");
-       // Add the token to cookie and send the response back to the user
-      res.cookie("token", token);
+      const token = await user.getJWT();
+
+      res.cookie("token", token, {
+        expires: new Date(Date.now() + 8 * 3600000),
+      });
       res.send("Login Successful!!!");
     } else {
       throw new Error("Invalid credentials");
@@ -60,23 +61,29 @@ app.post("/login", async (req, res) => {
     res.status(400).send("ERROR : " + err.message);
   }
 });
-  
-app.get("/profile", async (req, res) => {
+
+app.get("/profile", userAuth, async (req, res) => {
   try {
-    const cookies = req.cookies;
-    const { token } = cookies;
-    if (!token) {
-      throw new Error("Invalid Token");
-    }
-    const decodedMessage = await jwt.verify(token, "DEV@Tinder$790");
-    const { _id } = decodedMessage;
-    const user = await User.findById(_id);
-    if (!user) {
-      throw new Error("User does not exist");
-    }
+    const user = req.user;
+
     res.send(user);
   } catch (err) {
     res.status(400).send("ERROR : " + err.message);
+  }
+});
+
+app.post("/sendConnectionRequest", userAuth, async (req, res) => {
+  const user = req.user;
+  // Sending a connection request
+  console.log("Sending a connection request");
+
+  res.send(user.firstName + "sent the connect request!");
+});
+
+app.use("/", (err, req, res, next) => {  //wild card route to catch all errors
+  if (err) {
+    // Log your error
+    res.status(500).send("something went wrong");
   }
 });
 
@@ -111,36 +118,6 @@ app.get("/feed", async (req, res) => {
     res.status(400).send("Something went wrong ");
   }
 });
-
-
-//Create Post api for user in mongoose
-
-app.post("/signup", async (req, res) => {
-  try {
-    // Validation of data
-    validateSignUpData(req);
-
-    const { firstName, lastName, emailId, password } = req.body;
-
-    // Encrypt the password
-    const passwordHash = await bcrypt.hash(password, 10);
-    console.log(passwordHash);
-
-    //   Creating a new instance of the User model
-    const user = new User({
-      firstName,
-      lastName,
-      emailId,
-      password: passwordHash,
-    });
-
-    await user.save();
-    res.send("User Added successfully!");
-  } catch (err) {
-    res.status(400).send("ERROR : " + err.message);
-  }
-});
-
 
 // delete a user from the database
 app.delete("/user", async (req, res) => {
@@ -182,13 +159,13 @@ app.patch("/user/:userId", async (req, res) => {
   }
 });
 
-
-connectDB().then(() =>{
-    console.log("Connected to MongoDB")
+connectDB()
+  .then(() => {
+    console.log("Database connection established...");
     app.listen(7777, () => {
       console.log("Server is successfully listening on port 7777...");
     });
-})
-.catch((err) => {
-   console.log(err)
-})
+  })
+  .catch((err) => {
+    console.error("Database cannot be connected!!");
+});
