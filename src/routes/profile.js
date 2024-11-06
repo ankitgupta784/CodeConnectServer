@@ -4,6 +4,7 @@ const profileRouter = express.Router();
 const { userAuth } = require("../middlewares/auth");
 const { validateEditProfileData } = require("../utils/validation");
 const bcrypt = require("bcrypt");
+const User = require("../models/user");
 
 profileRouter.get("/profile/view", userAuth, async (req, res) => {
     try {
@@ -33,16 +34,23 @@ profileRouter.get("/profile/view", userAuth, async (req, res) => {
     }
   });
 
-  profileRouter.patch("/profile/password", userAuth, async (req, res) => {
+  profileRouter.patch("/profile/password", async (req, res) => {
     try {
-      const loggedInUser = req.user;
-      const passwordHash = await bcrypt.hash(req.body.password, 10);
-      loggedInUser.password = passwordHash;
-      await loggedInUser.save();
-      res.send("password update Successfully");
-    } catch (err) {
-      res.status(400).send("ERROR : " + err.message);
-    }
+        const user = await User.findOne({ emailId: req.body.emailId });
+        const id = user._id;
+        if (!user) {
+          res.status(404).send("User not Exists");
+        } else {      
+            const passwordHash = await bcrypt.hash(req.body.password, 10);
+            const user = await User.findByIdAndUpdate({ _id: id}, { password: passwordHash}, {
+              returnDocument: "after",
+              runValidators: true,
+            });
+            res.send("password update Successfully");
+        }
+     } catch (err) {
+       res.status(400).send("ERROR : " + err.message);
+     }
   });
 
 module.exports = profileRouter;
