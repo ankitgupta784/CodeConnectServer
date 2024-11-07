@@ -97,6 +97,10 @@ app.patch("/user/:userId", async (req, res) => {
   }
 });
 
+app.use('*', function (req, res) {
+  res.status(404).send("page Not Found");
+})
+
 connectDB()
   .then(() => {
     console.log("Database connection established...");
