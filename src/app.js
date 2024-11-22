@@ -8,7 +8,8 @@ const cors = require("cors");
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "https://codeconnectclient.onrender.com",
+    //origin: "http://localhost:5173",
     credentials: true,
   })
 );
@@ -20,14 +21,13 @@ const profileRouter = require("./routes/profile");
 const requestRouter = require("./routes/request");
 const userRouter = require("./routes/user");
 
-
 app.use("/", authRouter);
 app.use("/", profileRouter);
 app.use("/", requestRouter);
 app.use("/", userRouter);
 
-
-app.use("/", (err, req, res, next) => {  //wild card route to catch all errors
+app.use("/", (err, req, res, next) => {
+  //wild card route to catch all errors
   if (err) {
     // Log your error
     res.status(500).send("something went wrong");
@@ -106,9 +106,9 @@ app.patch("/user/:userId", async (req, res) => {
   }
 });
 
-app.use('*', function (req, res) {
+app.use("*", function (req, res) {
   res.status(404).send("page Not Found");
-})
+});
 
 connectDB()
   .then(() => {
@@ -119,4 +119,4 @@ connectDB()
   })
   .catch((err) => {
     console.error("Database cannot be connected!!");
-});
+  });
